@@ -7,16 +7,20 @@ use rustc_hash::FxHashMap;
 
 fn main() {
     let file = File::open("measurements.txt").expect("measurements.txt file not found");
-    let reader = BufReader::new(file);
+    let mut reader = BufReader::new(file);
 
     let mut results: FxHashMap<String, Result> = FxHashMap::default();
 
-    for line in reader.lines() {
-        let line = line.unwrap();
+    let mut line = String::new();
+
+    while reader.read_line(&mut line).unwrap() != 0 {
         let mut parts = line.split(';');
 
         let station = parts.next().unwrap();
         let measurement_string = parts.next().unwrap();
+
+        // Last byte is \n
+        let measurement_string = &measurement_string[..measurement_string.len() - 1];
 
         let measurement = measurement_string.parse::<f32>().unwrap();
 
@@ -27,6 +31,8 @@ fn main() {
 
         result.max = f32::max(measurement, result.max);
         result.min = f32::min(measurement, result.min);
+
+        line.clear();
     }
 
     let mut results = results.into_iter().collect::<Vec<_>>();
