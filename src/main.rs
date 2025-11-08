@@ -49,7 +49,7 @@ fn main() {
     let stdout = std::io::stdout();
     let mut lock = stdout.lock();
 
-    lock.write(b"{{").unwrap();
+    lock.write(b"{").unwrap();
 
     for (
         station,
@@ -79,7 +79,7 @@ fn main() {
     let avg = sum / *count as f32;
 
     lock.write(station).unwrap();
-    write!(lock, "={min:.1}/{avg:.1}/{max:.1}, ").unwrap();
+    write!(lock, "={min:.1}/{avg:.1}/{max:.1}}}").unwrap();
 }
 
 struct Result {
