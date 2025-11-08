@@ -1,5 +1,5 @@
 use std::{
-    collections::BTreeMap,
+    collections::HashMap,
     fs::File,
     io::{BufRead, BufReader},
 };
@@ -8,7 +8,7 @@ fn main() {
     let file = File::open("measurements.txt").expect("measurements.txt file not found");
     let reader = BufReader::new(file);
 
-    let mut results: BTreeMap<String, Result> = BTreeMap::default();
+    let mut results: HashMap<String, Result> = HashMap::default();
 
     for line in reader.lines() {
         let line = line.unwrap();
@@ -28,27 +28,24 @@ fn main() {
         result.min = f32::min(measurement, result.min);
     }
 
+    let mut results = results.into_iter().collect::<Vec<_>>();
+
+    results.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+
     print!("{{");
 
-    let mut iter = results.iter();
-
-    let mut i = 0;
-
-    while i < results.len() - 1 {
-        let (
-            station,
-            Result {
-                min,
-                sum,
-                count,
-                max,
-            },
-        ) = iter.next().unwrap();
-
+    for (
+        station,
+        Result {
+            min,
+            sum,
+            count,
+            max,
+        },
+    ) in results[..results.len() - 1].iter()
+    {
         let avg = sum / *count as f32;
         print!("{station}={min:.1}/{avg:.1}/{max:.1}, ");
-
-        i += 1;
     }
 
     let (
@@ -59,7 +56,7 @@ fn main() {
             count,
             max,
         },
-    ) = iter.next().unwrap();
+    ) = results.last().unwrap();
     let avg = sum / *count as f32;
 
     print!("{station}={min:.1}/{avg:.1}/{max:.1}}}");
