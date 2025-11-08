@@ -9,7 +9,7 @@ fn main() {
     let file = File::open("measurements.txt").expect("measurements.txt file not found");
     let mut reader = BufReader::new(file);
 
-    let mut results: FxHashMap<String, Result> = FxHashMap::default();
+    let mut results: FxHashMap<Vec<u8>, Result> = FxHashMap::default();
 
     let mut station_raw = Vec::new();
     let mut measurement_raw = Vec::new();
@@ -18,7 +18,7 @@ fn main() {
         reader.read_until(b'\n', &mut measurement_raw).unwrap();
 
         // Last byte is `;`
-        let station = std::str::from_utf8(&station_raw[..station_raw.len() - 1]).unwrap();
+        let station = &station_raw[..station_raw.len() - 1];
 
         // Last byte is `\n`
         let measurement_string =
@@ -29,7 +29,7 @@ fn main() {
         let result = if let Some(result) = results.get_mut(station) {
             result
         } else {
-            results.entry(station.to_string()).or_default()
+            results.entry(station.to_vec()).or_default()
         };
 
         result.sum += measurement;
@@ -49,7 +49,7 @@ fn main() {
     let stdout = std::io::stdout();
     let mut lock = stdout.lock();
 
-    write!(lock, "{{").unwrap();
+    lock.write(b"{{").unwrap();
 
     for (
         station,
@@ -62,7 +62,9 @@ fn main() {
     ) in results[..results.len() - 1].iter()
     {
         let avg = sum / *count as f32;
-        write!(lock, "{station}={min:.1}/{avg:.1}/{max:.1}, ").unwrap();
+
+        lock.write(station).unwrap();
+        write!(lock, "={min:.1}/{avg:.1}/{max:.1}, ").unwrap();
     }
 
     let (
@@ -76,7 +78,8 @@ fn main() {
     ) = results.last().unwrap();
     let avg = sum / *count as f32;
 
-    write!(lock, "{station}={min:.1}/{avg:.1}/{max:.1}}}").unwrap();
+    lock.write(station).unwrap();
+    write!(lock, "={min:.1}/{avg:.1}/{max:.1}, ").unwrap();
 }
 
 struct Result {
