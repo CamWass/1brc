@@ -11,16 +11,18 @@ fn main() {
 
     let mut results: FxHashMap<String, Result> = FxHashMap::default();
 
-    let mut line = String::new();
+    let mut station_raw = Vec::new();
+    let mut measurement_raw = Vec::new();
 
-    while reader.read_line(&mut line).unwrap() != 0 {
-        let mut parts = line.split(';');
+    while reader.read_until(b';', &mut station_raw).unwrap() != 0 {
+        reader.read_until(b'\n', &mut measurement_raw).unwrap();
 
-        let station = parts.next().unwrap();
-        let measurement_string = parts.next().unwrap();
+        // Last byte is `;`
+        let station = std::str::from_utf8(&station_raw[..station_raw.len() - 1]).unwrap();
 
-        // Last byte is \n
-        let measurement_string = &measurement_string[..measurement_string.len() - 1];
+        // Last byte is `\n`
+        let measurement_string =
+            std::str::from_utf8(&measurement_raw[..measurement_raw.len() - 1]).unwrap();
 
         let measurement = measurement_string.parse::<f32>().unwrap();
 
@@ -36,7 +38,8 @@ fn main() {
         result.max = f32::max(measurement, result.max);
         result.min = f32::min(measurement, result.min);
 
-        line.clear();
+        station_raw.clear();
+        measurement_raw.clear();
     }
 
     let mut results = results.into_iter().collect::<Vec<_>>();
