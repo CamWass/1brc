@@ -1,14 +1,15 @@
 use std::{
-    collections::HashMap,
     fs::File,
     io::{BufRead, BufReader},
 };
+
+use rustc_hash::FxHashMap;
 
 fn main() {
     let file = File::open("measurements.txt").expect("measurements.txt file not found");
     let reader = BufReader::new(file);
 
-    let mut results: HashMap<String, Result> = HashMap::default();
+    let mut results: FxHashMap<String, Result> = FxHashMap::default();
 
     for line in reader.lines() {
         let line = line.unwrap();
