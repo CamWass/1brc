@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Write},
 };
 
 use rustc_hash::FxHashMap;
@@ -46,7 +46,10 @@ fn main() {
 
     results.sort_unstable_by(|a, b| a.0.cmp(&b.0));
 
-    print!("{{");
+    let stdout = std::io::stdout();
+    let mut lock = stdout.lock();
+
+    write!(lock, "{{").unwrap();
 
     for (
         station,
@@ -59,7 +62,7 @@ fn main() {
     ) in results[..results.len() - 1].iter()
     {
         let avg = sum / *count as f32;
-        print!("{station}={min:.1}/{avg:.1}/{max:.1}, ");
+        write!(lock, "{station}={min:.1}/{avg:.1}/{max:.1}, ").unwrap();
     }
 
     let (
@@ -73,7 +76,7 @@ fn main() {
     ) = results.last().unwrap();
     let avg = sum / *count as f32;
 
-    print!("{station}={min:.1}/{avg:.1}/{max:.1}}}");
+    write!(lock, "{station}={min:.1}/{avg:.1}/{max:.1}}}").unwrap();
 }
 
 struct Result {
