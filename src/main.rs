@@ -21,10 +21,9 @@ fn main() {
         let station = &station_raw[..station_raw.len() - 1];
 
         // Last byte is `\n`
-        let measurement_string =
-            std::str::from_utf8(&measurement_raw[..measurement_raw.len() - 1]).unwrap();
+        let measurement_bytes = &measurement_raw[..measurement_raw.len() - 1];
 
-        let measurement = measurement_string.parse::<f32>().unwrap();
+        let measurement = parse_measurement(measurement_bytes);
 
         let result = if let Some(result) = results.get_mut(station) {
             result
@@ -80,6 +79,41 @@ fn main() {
 
     lock.write(station).unwrap();
     write!(lock, "={min:.1}/{avg:.1}/{max:.1}}}").unwrap();
+}
+
+fn parse_measurement(measurement_bytes: &[u8]) -> f32 {
+    // - 1 for the fractional digit - ignore the decimal point.
+    let mut whole_bytes = &measurement_bytes[..measurement_bytes.len() - 2];
+
+    let mut negative = false;
+
+    if whole_bytes.first() == Some(&b'-') {
+        negative = true;
+        whole_bytes = &whole_bytes[1..]
+    }
+
+    let fractional = byte_ascii_digit(measurement_bytes.last().unwrap()) as f32;
+
+    let mut whole: f32 = 0.0;
+
+    let mut pow: f32 = 1.0;
+
+    for byte in whole_bytes.iter().rev() {
+        whole += byte_ascii_digit(byte) as f32 * pow;
+        pow *= 10.0;
+    }
+
+    let mut measurement = whole + fractional / 10.0;
+
+    if negative {
+        measurement *= -1.0;
+    }
+
+    measurement
+}
+
+fn byte_ascii_digit(byte: &u8) -> u8 {
+    byte - b'0'
 }
 
 struct Result {
