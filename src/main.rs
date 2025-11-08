@@ -24,7 +24,11 @@ fn main() {
 
         let measurement = measurement_string.parse::<f32>().unwrap();
 
-        let result = results.entry(station.to_string()).or_default();
+        let result = if let Some(result) = results.get_mut(station) {
+            result
+        } else {
+            results.entry(station.to_string()).or_default()
+        };
 
         result.sum += measurement;
         result.count += 1;
