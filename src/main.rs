@@ -4,7 +4,7 @@
 
 use std::{fs::File, io::Write};
 
-use rustc_hash::FxHashMap;
+use foldhash::HashMap;
 
 use crate::buffer::BufReader;
 
@@ -15,7 +15,7 @@ fn main() {
 
     let mut reader = BufReader::new(file);
 
-    let mut results: FxHashMap<Vec<u8>, Result> = FxHashMap::default();
+    let mut results: HashMap<Vec<u8>, Result> = HashMap::default();
 
     let mut bytes = reader.fill_buf().unwrap();
 

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rustc-hash = "2.1.1"
+foldhash = "0.2.0"
 
 [profile.release]
 codegen-units = 1
