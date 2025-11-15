@@ -1,44 +1,91 @@
-use std::{
-    fs::File,
-    io::{BufRead, BufReader, Write},
-};
+#![feature(core_io_borrowed_buf)]
+#![feature(read_buf)]
+#![feature(maybe_uninit_slice)]
+
+use std::{fs::File, io::Write};
 
 use rustc_hash::FxHashMap;
 
+use crate::buffer::BufReader;
+
+mod buffer;
+
 fn main() {
     let file = File::open("measurements.txt").expect("measurements.txt file not found");
+
     let mut reader = BufReader::new(file);
 
     let mut results: FxHashMap<Vec<u8>, Result> = FxHashMap::default();
 
-    let mut station_raw = Vec::new();
-    let mut measurement_raw = Vec::new();
+    let mut bytes = reader.fill_buf().unwrap();
 
-    while reader.read_until(b';', &mut station_raw).unwrap() != 0 {
-        reader.read_until(b'\n', &mut measurement_raw).unwrap();
+    // Parse lines from the reader. When we parse a line, we mark the input up
+    // to that point as consumed. Then, when we've exhausted the buffer, we
+    // backshift the unconsumed tail portion to the start of the buffer and
+    // refill it up to capacity.
+    while bytes.len() > 0 {
+        let mut station_start = 0;
 
-        // Last byte is `;`
-        let station = &station_raw[..station_raw.len() - 1];
+        let mut i = 0;
 
-        // Last byte is `\n`
-        let measurement_bytes = &measurement_raw[..measurement_raw.len() - 1];
+        let mut consumed = 0;
 
-        let measurement = parse_measurement(measurement_bytes);
+        while i < bytes.len() {
+            let byte = bytes[i];
 
-        let result = if let Some(result) = results.get_mut(station) {
-            result
-        } else {
-            results.entry(station.to_vec()).or_default()
-        };
+            if byte == b';' {
+                let station = &bytes[station_start..i];
 
-        result.sum += measurement;
-        result.count += 1;
+                let measurement_start = i + 1;
 
-        result.max = f32::max(measurement, result.max);
-        result.min = f32::min(measurement, result.min);
+                let mut j = measurement_start;
 
-        station_raw.clear();
-        measurement_raw.clear();
+                while j < bytes.len() {
+                    let byte = bytes[j];
+
+                    if byte == b'\n' {
+                        let measurement_bytes = &bytes[measurement_start..j];
+
+                        let measurement = parse_measurement(measurement_bytes);
+
+                        let result = if let Some(result) = results.get_mut(station) {
+                            result
+                        } else {
+                            results.entry(station.to_vec()).or_default()
+                        };
+
+                        result.sum += measurement;
+                        result.count += 1;
+
+                        result.max = f32::max(measurement, result.max);
+                        result.min = f32::min(measurement, result.min);
+
+                        j += 1;
+                        consumed = j;
+                        break;
+                    }
+
+                    j += 1;
+                }
+
+                i = j;
+
+                station_start = i;
+            } else {
+                i += 1;
+            }
+        }
+
+        // Inform the reader of how many bytes we actually 'used'.
+        reader.consume(consumed);
+
+        // Shift any unconsumed bytes to the start of the buffer.
+        reader.buf.backshift();
+
+        // Fill the buffer up to capacity, or with all remaining bytes from the
+        // file.
+        reader.buf.read_more(&reader.inner).unwrap();
+        bytes = reader.buf.buffer();
     }
 
     let mut results = results.into_iter().collect::<Vec<_>>();
