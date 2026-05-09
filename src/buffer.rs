@@ -5,7 +5,7 @@ use std::cmp;
 use std::io::{self, BorrowedBuf, Read};
 use std::mem::MaybeUninit;
 
-const DEFAULT_BUF_SIZE: usize = 8192;
+const DEFAULT_BUF_SIZE: usize = 512_000;
 
 pub struct BufReader<R: ?Sized> {
     pub buf: Buffer,
