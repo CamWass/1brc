@@ -125,7 +125,7 @@ fn process_chunk(
     // .take() ensures each thread doesn't read past its chunk.
     let mut reader = BufReader::new(file.take(chunk_end - chunk_start));
 
-    let mut results: Results = Results::default();
+    let mut results: Results = Results::with_capacity_and_hasher(512, Default::default());
 
     let mut bytes = reader.fill_buf().unwrap();
 
