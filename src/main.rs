@@ -100,7 +100,7 @@ fn main() {
     write!(lock, "={min:.1}/{avg:.1}/{max:.1}}}").unwrap();
 }
 
-type Results = HashMap<Vec<u8>, Result>;
+type Results = HashMap<Box<[u8]>, Result>;
 
 #[derive(Default)]
 struct ChunkProcessingResult {
@@ -218,7 +218,7 @@ fn parse_buffer(start_index: usize, buffer: &[u8], results: &mut Results) -> usi
                     let result = if let Some(result) = results.get_mut(station) {
                         result
                     } else {
-                        results.entry(station.to_vec()).or_default()
+                        results.entry(Box::from(station)).or_default()
                     };
 
                     result.sum += measurement;
