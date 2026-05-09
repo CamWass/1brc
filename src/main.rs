@@ -79,7 +79,10 @@ fn main() {
         },
     ) in results[..results.len() - 1].iter()
     {
-        let avg = sum / *count as f32;
+        let avg = *sum as f32 / 10.0 / *count as f32;
+
+        let min = *min as f32 / 10.0;
+        let max = *max as f32 / 10.0;
 
         lock.write(station).unwrap();
         write!(lock, "={min:.1}/{avg:.1}/{max:.1}, ").unwrap();
@@ -94,7 +97,10 @@ fn main() {
             max,
         },
     ) = results.last().unwrap();
-    let avg = sum / *count as f32;
+    let avg = *sum as f32 / 10.0 / *count as f32;
+
+    let min = *min as f32 / 10.0;
+    let max = *max as f32 / 10.0;
 
     lock.write(station).unwrap();
     write!(lock, "={min:.1}/{avg:.1}/{max:.1}}}").unwrap();
@@ -221,11 +227,11 @@ fn parse_buffer(start_index: usize, buffer: &[u8], results: &mut Results) -> usi
                         results.entry(Box::from(station)).or_default()
                     };
 
-                    result.sum += measurement;
+                    result.sum += measurement as i64;
                     result.count += 1;
 
-                    result.max = f32::max(measurement, result.max);
-                    result.min = f32::min(measurement, result.min);
+                    result.max = i32::max(measurement, result.max);
+                    result.min = i32::min(measurement, result.min);
 
                     j += 1;
                     consumed = j;
@@ -246,35 +252,43 @@ fn parse_buffer(start_index: usize, buffer: &[u8], results: &mut Results) -> usi
     consumed
 }
 
-fn parse_measurement(measurement_bytes: &[u8]) -> f32 {
-    // - 1 for the fractional digit - ignore the decimal point.
-    let mut whole_bytes = &measurement_bytes[..measurement_bytes.len() - 2];
+fn parse_measurement(measurement_bytes: &[u8]) -> i32 {
+    // The rules state that the measurement is a double between -99.9
+    // (inclusive) and 99.9 (inclusive), always with one fractional digit.
 
-    let mut negative = false;
+    let len = measurement_bytes.len();
 
-    if whole_bytes.first() == Some(&b'-') {
-        negative = true;
-        whole_bytes = &whole_bytes[1..]
-    }
+    debug_assert!(len == 4 || len == 3);
+    // Eliminates a couple of bounds checks and saves 5ms - not that much, but
+    // the condition is guaranteed by the rules,  so it's a free win.
+    unsafe { std::hint::assert_unchecked(len >= 3) };
 
-    let fractional = byte_ascii_digit(measurement_bytes.last().unwrap()) as f32;
+    // Last byte is always the fractional digit, second-to-last is always '.',
+    // and third-to-last is always the ones digit.
+    let frac = parse_ascii_digit(measurement_bytes[len - 1]);
+    let ones = parse_ascii_digit(measurement_bytes[len - 3]);
 
-    let mut whole: f32 = 0.0;
+    let first = measurement_bytes[0];
+    let negative = (first == b'-') as i32;
 
-    let mut pow: f32 = 1.0;
+    // Either the tens digit is at len-4 and the measurement is of the form XX.X
+    // or -XX.X, or the measurement is of the form X.X or -X.X and the tens
+    // digit is implicitly 0.
+    let tens_byte = if len >= 4 {
+        measurement_bytes[len - 4]
+    } else {
+        b'0'
+    };
+    let tens = if tens_byte >= b'0' {
+        parse_ascii_digit(tens_byte)
+    } else {
+        0
+    };
 
-    for byte in whole_bytes.iter().rev() {
-        whole += byte_ascii_digit(byte) as f32 * pow;
-        pow *= 10.0;
-    }
+    let value = 10 * (tens * 10 + ones) + frac;
 
-    let mut measurement = whole + fractional / 10.0;
-
-    if negative {
-        measurement *= -1.0;
-    }
-
-    measurement
+    // Branch-less negate: value * (1 - 2 * negative)
+    value - 2 * negative * value
 }
 
 /// Combines the data from two chunks into one.
@@ -294,31 +308,33 @@ fn merge_chunk_results(
         result.sum += value.sum;
         result.count += value.count;
 
-        result.max = f32::max(value.max, result.max);
-        result.min = f32::min(value.min, result.min);
+        result.max = i32::max(value.max, result.max);
+        result.min = i32::min(value.min, result.min);
     }
 
     a
 }
 
-fn byte_ascii_digit(byte: &u8) -> u8 {
-    byte - b'0'
+fn parse_ascii_digit(byte: u8) -> i32 {
+    (byte - b'0') as i32
 }
 
 struct Result {
-    min: f32,
-    sum: f32,
+    // min/max/sum are scaled by 10 so we don't have to use floating point.
+    min: i32,
+    max: i32,
+    sum: i64,
+
     count: u32,
-    max: f32,
 }
 
 impl Default for Result {
     fn default() -> Self {
         Result {
-            min: f32::INFINITY,
-            sum: 0.0,
+            min: i32::MAX,
+            max: i32::MIN,
             count: 0,
-            max: f32::NEG_INFINITY,
+            sum: 0,
         }
     }
 }
