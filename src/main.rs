@@ -233,7 +233,7 @@ fn parse_buffer(start_index: usize, buffer: &[u8], results: &mut Results) -> usi
             let result = if let Some(result) = results.get_mut(station) {
                 result
             } else {
-                results.entry(Box::from(station)).or_default()
+                get_or_insert_station_results(results, station)
             };
 
             result.sum += measurement as i64;
@@ -251,6 +251,12 @@ fn parse_buffer(start_index: usize, buffer: &[u8], results: &mut Results) -> usi
     }
 
     consumed
+}
+
+#[cold]
+#[inline(never)]
+fn get_or_insert_station_results<'a>(results: &'a mut Results, station: &[u8]) -> &'a mut Result {
+    results.entry(Box::from(station)).or_default()
 }
 
 fn parse_measurement(measurement_bytes: &[u8]) -> i32 {
