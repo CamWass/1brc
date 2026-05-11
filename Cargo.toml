@@ -10,6 +10,7 @@ num_cpus = "1.17.0"
 [profile.release]
 codegen-units = 1
 lto = "fat"
+panic = "abort"
 
 [profile.profiling]
 inherits = "release"
