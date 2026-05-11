@@ -211,38 +211,39 @@ fn parse_buffer(start_index: usize, buffer: &[u8], results: &mut Results) -> usi
 
             let measurement_start = i + 1;
 
-            let mut j = measurement_start;
+            // Measurement is always 3, 4, or 5 bytes:
+            // "X.X"   (3)  ->  '\n' at measurement_start+3
+            // "XX.X"  (4)  ->  '\n' at measurement_start+4
+            // "-X.X"  (4)  ->  '\n' at measurement_start+4
+            // "-XX.X" (5)  ->  '\n' at measurement_start+5
+            let newline_index = if buffer.get(measurement_start + 3).copied() == Some(b'\n') {
+                measurement_start + 3
+            } else if buffer.get(measurement_start + 4).copied() == Some(b'\n') {
+                measurement_start + 4
+            } else if buffer.get(measurement_start + 5).copied() == Some(b'\n') {
+                measurement_start + 5
+            } else {
+                break;
+            };
 
-            while j < buffer.len() {
-                let byte = buffer[j];
+            let measurement_bytes = &buffer[measurement_start..newline_index];
 
-                if byte == b'\n' {
-                    let measurement_bytes = &buffer[measurement_start..j];
+            let measurement = parse_measurement(measurement_bytes);
 
-                    let measurement = parse_measurement(measurement_bytes);
+            let result = if let Some(result) = results.get_mut(station) {
+                result
+            } else {
+                results.entry(Box::from(station)).or_default()
+            };
 
-                    let result = if let Some(result) = results.get_mut(station) {
-                        result
-                    } else {
-                        results.entry(Box::from(station)).or_default()
-                    };
+            result.sum += measurement as i64;
+            result.count += 1;
 
-                    result.sum += measurement as i64;
-                    result.count += 1;
+            result.max = i32::max(measurement, result.max);
+            result.min = i32::min(measurement, result.min);
 
-                    result.max = i32::max(measurement, result.max);
-                    result.min = i32::min(measurement, result.min);
-
-                    j += 1;
-                    consumed = j;
-                    break;
-                }
-
-                j += 1;
-            }
-
-            i = j;
-
+            i = newline_index + 1;
+            consumed = i;
             station_start = i;
         } else {
             i += 1;
